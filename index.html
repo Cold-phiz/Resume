@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: black;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      color: white;
+    }
+
+    .window {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+      cursor: move;
+      user-select: none;
+      backdrop-filter: blur(5px);
+      width: 250px;
+      min-height: 150px;
+      will-change: transform;
+    }
+
+    .window.dragging {
+      transition: none !important;
+      z-index: 1000 !important;
+    }
+
+    .window h2 {
+      margin-top: 0;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .window p {
+      color: rgba(255, 255, 255, 0.7);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="window" id="window1">
+    <h2>Window 1</h2>
+    <p>This is a draggable window with smooth animations. Try moving it around!</p>
+  </div>
+  <div class="window" id="window2">
+    <h2>Window 2</h2>
+    <p>Windows can be freely stacked and arranged however you like.</p>
+  </div>
+  <div class="window" id="window3">
+    <h2>Window 3</h2>
+    <p>The background is semi-transparent with a subtle blur effect.</p>
+  </div>
+  <div class="window" id="window4">
+    <h2>Window 4</h2>
+    <p>Each window has a soft white glow to make it stand out against the dark background.</p>
+  </div>
+
+  <script>
+    const windows = document.querySelectorAll('.window');
+    let activeWindow = null;
+    let startX;
+    let startY;
+    let mouseX = 0;
+    let mouseY = 0;
+    let prevMouseX = 0;
+    let prevMouseY = 0;
+    let mouseMoveStrength = 0;
+
+    // Position windows randomly without overlap
+    function positionWindows() {
+      const padding = 20;
+      const windowWidth = 290;
+      const windowHeight = 190;
+      const viewportWidth = window.innerWidth - windowWidth - padding;
+      const viewportHeight = window.innerHeight - windowHeight - padding;
+      
+      let positions = [];
+
+      windows.forEach(win => {
+        let position;
+        let attempts = 0;
+        const maxAttempts = 100;
+
+        do {
+          position = {
+            x: Math.floor(Math.random() * viewportWidth),
+            y: Math.floor(Math.random() * viewportHeight)
+          };
+          attempts++;
+        } while (
+          positions.some(pos => 
+            position.x < pos.x + windowWidth &&
+            position.x + windowWidth > pos.x &&
+            position.y < pos.y + windowHeight &&
+            position.y + windowHeight > pos.y
+          ) && attempts < maxAttempts
+        );
+
+        positions.push(position);
+        win.style.left = `${position.x}px`;
+        win.style.top = `${position.y}px`;
+        // Initialize window physics properties
+        win.baseX = position.x;
+        win.baseY = position.y;
+        win.velocityX = 0;
+        win.velocityY = 0;
+      });
+    }
+
+    positionWindows();
+    window.addEventListener('resize', positionWindows);
+
+    // Mouse movement tracking
+    document.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+      
+      // Calculate mouse movement strength
+      const dx = mouseX - prevMouseX;
+      const dy = mouseY - prevMouseY;
+      mouseMoveStrength = Math.min(Math.sqrt(dx * dx + dy * dy), 50) * 0.2;
+      
+      prevMouseX = mouseX;
+      prevMouseY = mouseY;
+    });
+
+    // Window physics animation
+    function animate() {
+      windows.forEach(win => {
+        if (!win.classList.contains('dragging')) {
+          const rect = win.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          
+          // Calculate distance from mouse
+          const dx = mouseX - centerX;
+          const dy = mouseY - centerY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const maxForceDistance = 300;
+          
+          if (distance < maxForceDistance) {
+            // Calculate repulsion force
+            const force = (1 - distance / maxForceDistance) * mouseMoveStrength;
+            const angle = Math.atan2(dy, dx);
+            
+            // Apply force away from mouse
+            win.velocityX -= Math.cos(angle) * force * 0.5;
+            win.velocityY -= Math.sin(angle) * force * 0.5;
+          }
+          
+          // Apply spring force back to original position
+        const offsetX = parseFloat(win.style.left) - win.baseX;
+        const offsetY = parseFloat(win.style.top) - win.baseY;
+        win.velocityX -= offsetX * 0.03; // reduced
+        win.velocityY -= offsetY * 0.03; // reduced
+
+          
+          // Apply damping
+          win.velocityX *= 0.9;
+          win.velocityY *= 0.9;
+          
+          // Update position
+          const newX = parseFloat(win.style.left) + win.velocityX;
+          const newY = parseFloat(win.style.top) + win.velocityY;
+          
+          win.style.left = `${newX}px`;
+          win.style.top = `${newY}px`;
+          
+          // Add some gentle floating motion
+          const time = Date.now() / 1000;
+          const floatX = Math.sin(time + parseFloat(win.baseX)) * 0.5;
+          const floatY = Math.cos(time + parseFloat(win.baseY)) * 0.5;
+          
+          win.style.transform = `translate(${floatX}px, ${floatY}px)`;
+        }
+      });
+      
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+
+    // Dragging functionality
+    windows.forEach(window => {
+      window.addEventListener('mousedown', dragStart);
+      window.addEventListener('touchstart', dragStart, { passive: false });
+    });
+
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('touchmove', drag, { passive: false });
+    document.addEventListener('mouseup', dragEnd);
+    document.addEventListener('touchend', dragEnd);
+
+    function dragStart(e) {
+      if (e.target.closest('.window')) {
+        activeWindow = e.target.closest('.window');
+        activeWindow.classList.add('dragging');
+        
+        // Get current position
+        const rect = activeWindow.getBoundingClientRect();
+        
+        if (e.type === 'touchstart') {
+          startX = e.touches[0].clientX - rect.left;
+          startY = e.touches[0].clientY - rect.top;
+        } else {
+          startX = e.clientX - rect.left;
+          startY = e.clientY - rect.top;
+        }
+      }
+    }
+
+    function drag(e) {
+      if (activeWindow) {
+        e.preventDefault();
+        
+        let x, y;
+        if (e.type === 'touchmove') {
+          x = e.touches[0].clientX - startX;
+          y = e.touches[0].clientY - startY;
+        } else {
+          x = e.clientX - startX;
+          y = e.clientY - startY;
+        }
+
+        activeWindow.style.left = `${x}px`;
+        activeWindow.style.top = `${y}px`;
+        activeWindow.baseX = x;
+        activeWindow.baseY = y;
+      }
+    }
+
+    function dragEnd() {
+      if (activeWindow) {
+        activeWindow.classList.remove('dragging');
+        activeWindow.velocityX = 0;
+        activeWindow.velocityY = 0;
+        activeWindow = null;
+      }
+    }
+  </script>
+</body>
+</html>

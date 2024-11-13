@@ -1,38 +1,169 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-    <link rel="stylesheet" href="static/styles.css">
-    <title>Resume</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: black;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      color: white;
+    }
+
+    .window {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+      cursor: move;
+      user-select: none;
+      backdrop-filter: blur(5px);
+      width: 250px;
+      min-height: 150px;
+    }
+
+    .window.dragging {
+      transition: transform 0.1s linear;
+    }
+
+    .window h2 {
+      margin-top: 0;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .window p {
+      color: rgba(255, 255, 255, 0.7);
+      line-height: 1.5;
+    }
+  </style>
 </head>
-
 <body>
-    <div class="window" id="window1">
-        <h2>Window 1</h2>
-        <p>This is a draggable window with smooth animations. Try moving it around!</p>
-    </div>
+  <div class="window" id="window1">
+    <h2>Window 1</h2>
+    <p>This is a draggable window with smooth animations. Try moving it around!</p>
+  </div>
+  <div class="window" id="window2">
+    <h2>Window 2</h2>
+    <p>Windows can be freely stacked and arranged however you like.</p>
+  </div>
+  <div class="window" id="window3">
+    <h2>Window 3</h2>
+    <p>The background is semi-transparent with a subtle blur effect.</p>
+  </div>
+  <div class="window" id="window4">
+    <h2>Window 4</h2>
+    <p>Each window has a soft white glow to make it stand out against the dark background.</p>
+  </div>
 
-    <div class="window" id="window2">
-        <h2>Window 2</h2>
-        <p>Windows can be freely stacked and arranged however you like.</p>
-    </div>
+  <script>
+    const windows = document.querySelectorAll('.window');
+    let activeWindow = null;
+    let startX = 0;
+    let startY = 0;
 
-    <div class="window" id="window3">
-        <h2>Window 3</h2>
-        <p>The background is semi-transparent with a subtle blur effect.</p>
-    </div>
+    function getRandomPosition() {
+        const windowWidth = 290;  // width + padding
+        const windowHeight = 190; // height + padding
+        return {
+            x: Math.random() * (window.innerWidth - windowWidth),
+            y: Math.random() * (window.innerHeight - windowHeight)
+        };
+    }
 
-    <div class="window" id="window4">
-        <h2>Window 4</h2>
-        <p>Each window has a soft white glow to make it stand out against the dark background.</p>
-    </div>
-    
-    <div class="window" id="window5">
-        <h2>Window 5</h2>
-        <p>This is me testing if more than 4 windows can exist at once.</p>
-    </div>
+    // Initialize random positions
+    windows.forEach(win => {
+      const position = getRandomPosition();
+      win.position = position;
+      win.style.transform = `translate(${position.x}px, ${position.y}px)`;
+      
+      win.addEventListener('mousedown', e => dragStart(e, win));
+      win.addEventListener('touchstart', e => dragStart(e, win), { passive: false });
+      win.addEventListener('transitionend', () => {
+        const style = win.style.transform;
+        const match = style.match(/translate\((-?\d+\.?\d*)px,\s*(-?\d+\.?\d*)px\)/);
+        if (match) {
+          win.position.x = parseFloat(match[1]);
+          win.position.y = parseFloat(match[2]);
+        }
+      });
+    });
 
-    <script src="static/window-manager.js"></script>
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('touchmove', drag, { passive: false });
+    document.addEventListener('mouseup', dragEnd);
+    document.addEventListener('touchend', dragEnd);
+
+    function dragStart(e, win) {
+      if (activeWindow) {
+        activeWindow.classList.remove('dragging');
+        const style = activeWindow.style.transform;
+        const match = style.match(/translate\((-?\d+\.?\d*)px,\s*(-?\d+\.?\d*)px\)/);
+        if (match) {
+          activeWindow.position.x = parseFloat(match[1]);
+          activeWindow.position.y = parseFloat(match[2]);
+        }
+      }
+      
+      activeWindow = win;
+      const position = activeWindow.position;
+      
+      if (e.type === 'touchstart') {
+        startX = e.touches[0].clientX - position.x;
+        startY = e.touches[0].clientY - position.y;
+      } else {
+        startX = e.clientX - position.x;
+        startY = e.clientY - position.y;
+      }
+
+      windows.forEach(w => w.style.zIndex = "1");
+      activeWindow.style.zIndex = "2";
+      activeWindow.classList.add('dragging');
+    }
+
+    function drag(e) {
+      if (!activeWindow) return;
+      e.preventDefault();
+
+      let x, y;
+      if (e.type === 'touchmove') {
+        x = e.touches[0].clientX - startX;
+        y = e.touches[0].clientY - startY;
+      } else {
+        x = e.clientX - startX;
+        y = e.clientY - startY;
+      }
+
+      activeWindow.position.x = x;
+      activeWindow.position.y = y;
+      
+      activeWindow.style.transform = `translate(${x}px, ${y}px)`;
+    }
+
+    function dragEnd() {
+      if (!activeWindow) return;
+      
+      const style = window.getComputedStyle(activeWindow);
+      const matrix = new DOMMatrix(style.transform);
+      
+      activeWindow.position.x = matrix.m41;
+      activeWindow.position.y = matrix.m42;
+      activeWindow.style.transform = `translate(${matrix.m41}px, ${matrix.m42}px)`;
+      
+      activeWindow.classList.remove('dragging');
+      activeWindow = null;
+    }
+
+    // Reposition windows when window is resized
+    window.addEventListener('resize', () => {
+      windows.forEach(win => {
+        const position = getRandomPosition();
+        win.position = position;
+        win.style.transform = `translate(${position.x}px, ${position.y}px)`;
+      });
+    });
+  </script>
 </body>
-
 </html>
